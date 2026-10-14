@@ -2,7 +2,7 @@
 
 手機推理遊戲 **ColorSweeper** 的網頁解題器。輸入盤面後，它不直接給答案，而是**一步一步告訴你下一格怎麼推出來**，並用中文說明理由。
 
-👉 **線上使用：<https://yuutatsubasa.github.io/Color-Sweeper-Solver/>**
+👉 **線上使用：<https://yuuta-tsubasa.studio/Color-Sweeper-Solver/>**
 
 > 這是非官方的玩家自製工具，與遊戲開發商無關。
 

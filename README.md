@@ -87,3 +87,7 @@ node tests/soundness.js
   - Lv2：兩個計數限制的重疊比對。
   - Lv3：假設法，找出最短的矛盾鏈。
   - Lv4：窮舉搜尋。
+
+## 授權
+
+[MIT License](LICENSE)

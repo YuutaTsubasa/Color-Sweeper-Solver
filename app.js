@@ -33,7 +33,7 @@
   }
   // 盤面編進網址：base64url(JSON)
   function puzzleLink() {
-    const b64 = btoa(unescape(encodeURIComponent(S.serialize(puzzle)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const b64 = btoa(unescape(encodeURIComponent(S.serialize(Object.assign({}, puzzle, { colors: palette() }))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     return location.href.split('#')[0] + '#p=' + b64;
   }
   function loadFromHash() {
@@ -79,21 +79,25 @@
   function shade(hex, f) { return '#' + hexRgb(hex).map((x) => Math.round(x * f).toString(16).padStart(2, '0')).join(''); }
   function luminance(hex) { const [r, g, b] = hexRgb(hex); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
 
+  // 盤面可以附帶自己的配色（例如分享連結）；沒有就用「我的配色」
+  const validColors = (c) => Array.isArray(c) && c.length === 4 && c.every((x) => x && /^#[0-9a-f]{6}$/i.test(x.hex));
+  const palette = () => (validColors(puzzle.colors) ? puzzle.colors : theme);
+
   function applyTheme() {
     const root = document.documentElement.style;
-    theme.forEach((t, k) => {
+    palette().forEach((t, k) => {
       const light = luminance(t.hex) > 0.6;
       root.setProperty(`--c${k}-bg`, t.hex);
       root.setProperty(`--c${k}-fg`, light ? '#2b2a33' : '#ffffff');
       root.setProperty(`--c${k}`, light ? shade(t.hex, 0.7) : t.hex);
     });
-    S.setColorNames(theme.map((t) => t.name || '?'));
+    S.setColorNames(palette().map((t) => t.name || '?'));
   }
 
   // 這題用到的顏色：點色塊切換（遊戲 2 色、4 色時每次隨機抽顏色，照當下畫面點即可）
   function renderUsedColors() {
     const used = new Set(usedColors());
-    $('used-colors').innerHTML = theme.map((t, k) =>
+    $('used-colors').innerHTML = palette().map((t, k) =>
       `<button class="swatch${used.has(k) ? ' on' : ''}" data-slot="${k}" style="background:${t.hex}" title="${t.name}"><span>${used.has(k) ? '✓' : ''}</span></button>`).join('') +
       `<span class="hint">這題 ${used.size} 色</span>`;
   }
@@ -103,7 +107,7 @@
       if (used.size <= 2) { flash('至少要 2 種顏色'); return; }
       const inUse = puzzle.cells.some((c) => c.color === k) ||
         puzzle.rows.concat(puzzle.cols).some((lc) => lc && ((lc.count && lc.count.color === k) || (lc.major && lc.major.color === k) || (lc.blocks && lc.blocks.color === k)));
-      if (inUse) { flash(`盤面上還有用到「${theme[k].name}」，先改掉那些格子或線索再取消`); return; }
+      if (inUse) { flash(`盤面上還有用到「${palette()[k].name}」，先改掉那些格子或線索再取消`); return; }
       used.delete(k);
     } else used.add(k);
     puzzle.used = [...used].sort();
@@ -112,7 +116,12 @@
   }
 
   function renderThemeEditor() {
-    $('theme-editor').innerHTML = theme.map((t, k) =>
+    const own = palette() !== theme;
+    $('theme-owner').innerHTML = own
+      ? '這題<b>附帶自己的配色</b>（來自分享連結），下面修改的是這題的配色。' +
+        '<button id="btn-colors-save" class="ghost">存成我的配色</button><button id="btn-colors-drop" class="ghost">改用我的配色</button>'
+      : '';
+    $('theme-editor').innerHTML = palette().map((t, k) =>
       `<div class="row"><input type="color" data-slot="${k}" value="${t.hex}"><input type="text" data-slot="${k}" value="${t.name}" maxlength="4" class="tname"></div>`).join('');
   }
   const isSolved = (i) => mode === 'solve' && puzzle.cells[i].color == null && S.single(dom[i]) >= 0;
@@ -449,6 +458,7 @@
     n = Math.max(3, Math.min(12, n | 0));
     const old = puzzle, np = S.emptyPuzzle(n, usedColors());
     np.fake = old.fake;
+    if (old.colors) np.colors = old.colors;
     for (let r = 0; r < Math.min(n, old.n); r++) {
       for (let c = 0; c < Math.min(n, old.n); c++) {
         const cell = Object.assign({}, old.cells[r * old.n + c]);
@@ -783,7 +793,7 @@
   $('btn-none-rest').addEventListener('click', noneForRest);
   $('btn-save-progress').addEventListener('click', saveProgress);
 
-  function syncSettings() { $('size').value = puzzle.n; $('opt-fake').checked = !!puzzle.fake; renderUsedColors(); renderThemeEditor(); }
+  function syncSettings() { $('size').value = puzzle.n; $('opt-fake').checked = !!puzzle.fake; applyTheme(); renderUsedColors(); renderThemeEditor(); }
   $('opt-fake').addEventListener('change', (ev) => { puzzle.fake = ev.target.checked || undefined; save(); render(); });
   $('used-colors').addEventListener('click', (ev) => {
     const b = ev.target.closest('[data-slot]'); if (b) toggleUsed(Number(b.dataset.slot));
@@ -791,10 +801,18 @@
   $('theme-editor').addEventListener('input', (ev) => {
     const el = ev.target, k = Number(el.dataset.slot);
     if (Number.isNaN(k)) return;
-    if (el.type === 'color') theme[k].hex = el.value; else theme[k].name = el.value.trim() || `色${k + 1}`;
-    saveTheme(); applyTheme(); renderUsedColors(); render();
+    const pal = palette();
+    if (el.type === 'color') pal[k].hex = el.value; else pal[k].name = el.value.trim() || `色${k + 1}`;
+    if (pal === theme) saveTheme(); else save();
+    applyTheme(); renderUsedColors(); render();
+  });
+  $('theme-owner').addEventListener('click', (ev) => {
+    if (ev.target.id === 'btn-colors-save') { theme = puzzle.colors.map((x) => Object.assign({}, x)); saveTheme(); }
+    if (ev.target.id === 'btn-colors-drop') { delete puzzle.colors; save(); }
+    applyTheme(); syncSettings(); render();
   });
   $('btn-theme-reset').addEventListener('click', () => {
+    delete puzzle.colors; save();
     theme = DEFAULT_THEME.map((x) => Object.assign({}, x));
     saveTheme(); applyTheme(); syncSettings(); render();
   });

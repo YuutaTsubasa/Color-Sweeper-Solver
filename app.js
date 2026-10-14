@@ -446,6 +446,41 @@
       if (puzzle.cells[i].color == null && S.single(dom[i]) >= 0 && reveal.get(i)) ov.set(i, { color: S.single(dom[i]), clue: reveal.get(i) });
     }
     model = S.buildModel(puzzle, ov);
+    saveSolve();
+  }
+
+  // ---------- 解題進度保存：切換分頁或重新整理都不會不見 ----------
+  const SOLVE_KEY = 'colorsweeper-solve';
+  let solvedFor = null; // 目前進度對應的盤面內容
+
+  function saveSolve() {
+    solvedFor = S.serialize(puzzle);
+    try { localStorage.setItem(SOLVE_KEY, JSON.stringify({ p: solvedFor, dom, reveal: [...reveal], log })); } catch (e) { /* 無法儲存就算了 */ }
+  }
+  function loadSolve() {
+    try { return JSON.parse(localStorage.getItem(SOLVE_KEY)); } catch (e) { return null; }
+  }
+
+  // 進入解題分頁：盤面沒改就原封不動接續；有改就保留已推出的結果，並提醒可以重新開始
+  function enterSolve() {
+    const key = S.serialize(puzzle);
+    if (dom && model && solvedFor === key) { updateButtons(); render(); return; } // 連同顯示中的提示一起保留
+    const prev = dom && solvedFor ? { p: solvedFor, dom, reveal: [...reveal], log } : loadSolve();
+    const fresh = S.initialDomains(puzzle);
+    if (!prev || !Array.isArray(prev.dom) || prev.dom.length !== fresh.length) { startSolve(); return; }
+    dom = fresh.map((m, i) => m & prev.dom[i]);
+    reveal = new Map((prev.reveal || []).filter(([i]) => puzzle.cells[i] && puzzle.cells[i].color == null));
+    log = prev.log || []; history = []; current = null;
+    rebuildModel(); renderLog();
+    if (dom.some((m, i) => i < NC() && !m) || S.findContradiction(model, dom, null)) {
+      startSolve();
+      $('step').innerHTML = '<p class="hint">盤面修改後跟之前的解題進度有衝突，已重新開始。</p>';
+      return;
+    }
+    $('step').innerHTML = prev.p === key
+      ? '<p class="hint">已接續上次的解題進度。</p>'
+      : '<p class="hint">已保留之前的解題進度。如果剛才修改的是<b>先前輸入錯誤的線索</b>，請按「重新開始」重新推理。</p>';
+    updateButtons(); render();
   }
 
   function startSolve() {
@@ -454,8 +489,8 @@
     rebuildModel();
     renderLog();
     $('step').innerHTML = '<p class="hint">按「提示下一步」開始。推理由淺到深：單一線索 → 兩線索比對 → 假設法 → 窮舉。</p>';
-    const res = S.nextStep(model, dom, { allowSearch: false });
-    if (res.status === 'error') showResult(res);
+    const bad = S.findContradiction(model, dom, S.fmt(model));
+    if (bad) showResult({ status: 'error', html: `盤面有矛盾：${bad.html}。請檢查輸入是否正確。`, contradiction: bad });
     updateButtons();
     render();
   }
@@ -627,7 +662,7 @@
     $('tab-solve').classList.toggle('active', m === 'solve');
     $('panel-edit').hidden = m !== 'edit';
     $('panel-solve').hidden = m !== 'solve';
-    if (m === 'solve') { selLine = null; startSolve(); } else { current = null; render(); }
+    if (m === 'solve') { selLine = null; enterSolve(); } else render();
   }
 
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));

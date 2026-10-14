@@ -752,8 +752,11 @@
         const refs = new Set();
         res.chain.forEach((s) => s.refs.forEach((r) => refs.add(r)));
         if (res.contradiction.con) res.contradiction.con.refs.forEach((r) => refs.add(r));
+        // 只牽涉兩個線索（一個線索推一步、另一個線索就矛盾）的算 Lv2：其實就是兩線索連鎖
+        const short = res.chain.length === 0 || (res.chain.length === 1 && res.chain[0].level === 1);
         return {
-          level: 3, kind: 'trial', title: `假設法（${res.chain.length + 1} 步內出現矛盾）`, html,
+          level: short ? 2 : 3, kind: 'trial',
+          title: short ? '兩個線索連鎖（試一下就矛盾）' : `假設法（${res.chain.length + 1} 步內出現矛盾）`, html,
           short: `假設 ${F.varName(v)} 是${F.valT(v, a)} 會矛盾 → 不是${F.valT(v, a)}`,
           effects: [{ v, c: a, val: false }], refs: [...refs],
         };

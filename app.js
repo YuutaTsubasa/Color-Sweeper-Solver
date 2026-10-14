@@ -17,7 +17,9 @@
   // 範例：基本 + 射線 + 列計數 + 欄主要
   const SAMPLE = '{"n":6,"K":3,"cells":[{"color":null,"clue":null},{"color":0,"clue":{"type":"num","k":0}},{"color":2,"clue":{"type":"ray","dir":2,"k":1}},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":0,"clue":{"type":"num","k":1}},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":0,"clue":{"type":"num","k":3}},{"color":1,"clue":{"type":"num","k":1}},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":0,"clue":{"type":"num","k":2}},{"color":2,"clue":{"type":"num","k":2}},{"color":null,"clue":null},{"color":null,"clue":null},{"color":1,"clue":{"type":"num","k":2}},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":null,"clue":null},{"color":0,"clue":{"type":"ray","dir":2,"k":0}},{"color":null,"clue":null}],"rows":[{},{"count":{"color":1,"k":3}},{"count":{"color":2,"k":2}},{},{"count":{"color":1,"k":2}},{}],"cols":[{"major":{"color":1}},{"major":{"color":0}},{"major":{"color":null}},{"major":{"color":2}},{},{"major":{"color":2}}]}';
 
-  let puzzle = load() || S.parse(SAMPLE);
+  // 網址 #p=… 帶的盤面（分享連結）優先
+  const fromLink = loadFromHash();
+  let puzzle = fromLink || load() || S.parse(SAMPLE);
   let mode = 'edit';
   let sel = 0;              // 選取的格子
   let selLine = null;       // 選取的行列 {kind, idx}
@@ -29,6 +31,26 @@
   function load() {
     try { const t = localStorage.getItem(STORE_KEY); return t ? S.parse(t) : null; } catch (e) { return null; }
   }
+  // 盤面編進網址：base64url(JSON)
+  function puzzleLink() {
+    const b64 = btoa(unescape(encodeURIComponent(S.serialize(puzzle)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return location.href.split('#')[0] + '#p=' + b64;
+  }
+  function loadFromHash() {
+    const m = /^#p=([A-Za-z0-9_-]+)$/.exec(location.hash);
+    if (!m) return null;
+    try {
+      const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+      return S.parse(decodeURIComponent(escape(atob(b64))));
+    } catch (e) { return null; }
+  }
+
+  // 換成另一個盤面時，舊的解題進度不能沿用
+  function resetSolveState() {
+    dom = null; model = null; solvedFor = null; current = null; history = []; log = []; reveal = new Map();
+    try { localStorage.removeItem(SOLVE_KEY); } catch (e) { /* 無所謂 */ }
+  }
+
   function save() {
     try { localStorage.setItem(STORE_KEY, S.serialize(puzzle)); } catch (e) { /* 無法儲存就算了 */ }
   }
@@ -435,7 +457,7 @@
       np.rows[r] = old.rows[r] || {};
       np.cols[r] = old.cols[r] || {};
     }
-    puzzle = np; sel = 0; selLine = null; save(); render();
+    puzzle = np; sel = 0; selLine = null; resetSolveState(); save(); render();
   }
 
   // ---------- 解題 ----------
@@ -732,16 +754,23 @@
     clearTimeout(clearArmed); clearArmed = null; b.textContent = '清空';
     const fake = puzzle.fake;
     puzzle = S.emptyPuzzle(puzzle.n, usedColors());
+    resetSolveState();
     puzzle.fake = fake;
     sel = 0; selLine = null; save(); render();
   });
   $('btn-sample').addEventListener('click', () => {
-    puzzle = S.parse(SAMPLE); syncSettings(); sel = 0; selLine = null; save(); render();
+    puzzle = S.parse(SAMPLE); resetSolveState(); syncSettings(); sel = 0; selLine = null; save(); render();
   });
   $('btn-export').addEventListener('click', () => { $('io').value = S.serialize(puzzle); $('io-msg').textContent = ''; });
+  $('btn-share').addEventListener('click', async () => {
+    const url = puzzleLink();
+    $('io').value = url;
+    try { await navigator.clipboard.writeText(url); $('io-msg').textContent = '已複製分享連結：打開連結就會載入這個盤面。'; }
+    catch (e) { $('io-msg').textContent = '分享連結在上面的文字框裡，請手動複製。'; }
+  });
   $('btn-import').addEventListener('click', () => {
     try {
-      puzzle = S.parse($('io').value); syncSettings(); sel = 0; selLine = null; save(); render();
+      puzzle = S.parse($('io').value); resetSolveState(); syncSettings(); sel = 0; selLine = null; save(); render();
       $('io-msg').textContent = `已匯入 ${puzzle.n}×${puzzle.n} 盤面。`;
     } catch (e) { $('io-msg').textContent = '匯入失敗：' + e.message; }
   });
@@ -770,6 +799,10 @@
     saveTheme(); applyTheme(); syncSettings(); render();
   });
 
+  if (fromLink) {
+    resetSolveState(); save();
+    window.history.replaceState(null, '', location.pathname + location.search);
+  }
   applyTheme();
   lastColor = usedColors()[0];
   syncSettings();

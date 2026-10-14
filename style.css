@@ -70,6 +70,14 @@ summary { cursor: pointer; font-weight: 600; }
 .colbtn.c2 { background: var(--c2-bg); border-color: var(--c2); color: var(--c2-fg); }
 .colbtn.c3 { background: var(--c3-bg); border-color: var(--c3); color: var(--c3-fg); }
 .numbtn { min-width: 2.3em; }
+.used-row { margin: 0; }
+.swatch { width: 34px; height: 34px; padding: 0; border-radius: 8px; border: 2px solid var(--line); opacity: .35; }
+.swatch.on { opacity: 1; border-color: var(--text); }
+.swatch span { color: #fff; font-weight: 700; text-shadow: 0 0 3px rgba(0,0,0,.6); }
+.theme { margin: 6px 0; }
+.theme summary { font-weight: 400; font-size: .9rem; }
+.theme input[type=color] { width: 40px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
+.tname { width: 5em; font: inherit; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
 .glyphbtn { font-size: 1.1rem; min-width: 2.3em; }
 
 /* ---------- 盤面 ---------- */

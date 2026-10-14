@@ -28,13 +28,18 @@
       <div class="group">
         <div class="row">
           <label>大小 <input id="size" type="number" min="3" max="12" value="6"></label>
-          <label>顏色數
-            <select id="colors"><option value="2">2 色</option><option value="3" selected>3 色</option><option value="4">4 色</option></select>
-          </label>
-          <button id="btn-resize">套用</button>
+          <button id="btn-resize">套用大小</button>
           <button id="btn-clear" class="ghost">清空</button>
           <button id="btn-sample" class="ghost">載入範例</button>
         </div>
+        <div class="row"><span class="lbl-s">這題的顏色</span><div class="row used-row" id="used-colors"></div></div>
+        <p class="hint">遊戲 2 色、4 色時每次會隨機換顏色，照當下畫面點選出現的顏色即可。</p>
+        <details class="theme">
+          <summary>我的配色（跟遊戲設定一樣的顏色與名稱）</summary>
+          <div id="theme-editor"></div>
+          <button id="btn-theme-reset" class="ghost">恢復預設（寶石）</button>
+          <p class="hint">配色存在這台裝置的瀏覽器裡；名稱會用在解說文字中。</p>
+        </details>
         <label class="toggle"><input type="checkbox" id="opt-fake"> 偽裝規則（所有非零偶數都可能是實際值的兩倍，斜體顯示）</label>
       </div>
 

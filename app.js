@@ -34,6 +34,65 @@
   }
 
   const NC = () => puzzle.n * puzzle.n;
+  const usedColors = () => puzzle.used || [0, 1, 2];
+
+  // ---------- 配色：每個人的遊戲配色不同，存在這台裝置上 ----------
+  const THEME_KEY = 'colorsweeper-theme';
+  const DEFAULT_THEME = [
+    { name: '紫', hex: '#cdc9ec' }, { name: '藍', hex: '#4570f5' }, { name: '粉', hex: '#ec4a83' }, { name: '綠', hex: '#6dd5a6' },
+  ];
+  let theme = loadTheme();
+
+  function loadTheme() {
+    try {
+      const t = JSON.parse(localStorage.getItem(THEME_KEY));
+      if (Array.isArray(t) && t.length === 4 && t.every((x) => /^#[0-9a-f]{6}$/i.test(x.hex))) return t;
+    } catch (e) { /* 用預設 */ }
+    return DEFAULT_THEME.map((x) => Object.assign({}, x));
+  }
+  function saveTheme() { try { localStorage.setItem(THEME_KEY, JSON.stringify(theme)); } catch (e) { /* 無法儲存就算了 */ } }
+
+  // 依底色亮度決定文字用黑或白；邊框/✕ 用加深一點的顏色
+  function hexRgb(hex) { const v = parseInt(hex.slice(1), 16); return [v >> 16, (v >> 8) & 255, v & 255]; }
+  function shade(hex, f) { return '#' + hexRgb(hex).map((x) => Math.round(x * f).toString(16).padStart(2, '0')).join(''); }
+  function luminance(hex) { const [r, g, b] = hexRgb(hex); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
+
+  function applyTheme() {
+    const root = document.documentElement.style;
+    theme.forEach((t, k) => {
+      const light = luminance(t.hex) > 0.6;
+      root.setProperty(`--c${k}-bg`, t.hex);
+      root.setProperty(`--c${k}-fg`, light ? '#2b2a33' : '#ffffff');
+      root.setProperty(`--c${k}`, light ? shade(t.hex, 0.7) : t.hex);
+    });
+    S.setColorNames(theme.map((t) => t.name || '?'));
+  }
+
+  // 這題用到的顏色：點色塊切換（遊戲 2 色、4 色時每次隨機抽顏色，照當下畫面點即可）
+  function renderUsedColors() {
+    const used = new Set(usedColors());
+    $('used-colors').innerHTML = theme.map((t, k) =>
+      `<button class="swatch${used.has(k) ? ' on' : ''}" data-slot="${k}" style="background:${t.hex}" title="${t.name}"><span>${used.has(k) ? '✓' : ''}</span></button>`).join('') +
+      `<span class="hint">這題 ${used.size} 色</span>`;
+  }
+  function toggleUsed(k) {
+    const used = new Set(usedColors());
+    if (used.has(k)) {
+      if (used.size <= 2) { flash('至少要 2 種顏色'); return; }
+      const inUse = puzzle.cells.some((c) => c.color === k) ||
+        puzzle.rows.concat(puzzle.cols).some((lc) => lc && ((lc.count && lc.count.color === k) || (lc.major && lc.major.color === k) || (lc.blocks && lc.blocks.color === k)));
+      if (inUse) { flash(`盤面上還有用到「${theme[k].name}」，先改掉那些格子或線索再取消`); return; }
+      used.delete(k);
+    } else used.add(k);
+    puzzle.used = [...used].sort();
+    if (!puzzle.used.includes(lastColor)) lastColor = puzzle.used[0];
+    save(); syncSettings(); render();
+  }
+
+  function renderThemeEditor() {
+    $('theme-editor').innerHTML = theme.map((t, k) =>
+      `<div class="row"><input type="color" data-slot="${k}" value="${t.hex}"><input type="text" data-slot="${k}" value="${t.name}" maxlength="4" class="tname"></div>`).join('');
+  }
   const isSolved = (i) => mode === 'solve' && puzzle.cells[i].color == null && S.single(dom[i]) >= 0;
   const allSolved = () => dom.slice(0, NC()).every((m) => S.single(m) >= 0);
   const pendingCells = () => (allSolved() ? []
@@ -135,7 +194,7 @@
           if (pendingSet.has(i)) inner += '<span class="pending" title="還沒輸入遊戲中這格的線索">?</span>';
         } else if (mode === 'solve') {
           const m = dom[i], xs = [];
-          for (let k = 0; k < puzzle.K; k++) if (!(m & S.bit(k))) xs.push(`<span class="c${k}">✕</span>`);
+          for (const k of usedColors()) if (!(m & S.bit(k))) xs.push(`<span class="c${k}">✕</span>`);
           if (xs.length) inner = `<span class="xs">${xs.join('')}</span>`;
         }
         if (i === sel && !selLine) cls.push('selected');
@@ -290,15 +349,14 @@
   }
 
   function lineEditorHTML(lc) {
-    const K = puzzle.K;
     let h = `<h3>${selLine.kind === 'row' ? `第 ${selLine.idx + 1} 列` : `第 ${String.fromCharCode(65 + selLine.idx)} 欄`} 的線索</h3>`;
     h += '<div class="row"><span class="lbl-s">計數</span>' + btn('無', 'data-lact="count-color" data-v="-1"', !lc.count) +
-      Array.from({ length: K }, (_, c) => btn(S.PALETTE[c].name, `data-lact="count-color" data-v="${c}"`, lc.count && lc.count.color === c, `colbtn c${c}`)).join('') + '</div>';
+      usedColors().map((c) => btn(S.PALETTE[c].name, `data-lact="count-color" data-v="${c}"`, lc.count && lc.count.color === c, `colbtn c${c}`)).join('') + '</div>';
     if (lc.count) {
       h += '<div class="row"><span class="lbl-s">數量</span>' + Array.from({ length: puzzle.n + 1 }, (_, v) => btn(v, `data-lact="count-k" data-v="${v}"`, lc.count.k === v, 'numbtn')).join('') + '</div>';
     }
     h += '<div class="row"><span class="lbl-s">主要</span>' + btn('無', 'data-lact="major" data-v="none"', !lc.major) +
-      Array.from({ length: K }, (_, c) => btn('👑' + S.PALETTE[c].name, `data-lact="major" data-v="${c}"`, lc.major && lc.major.color === c, `colbtn c${c}`)).join('') +
+      usedColors().map((c) => btn('👑' + S.PALETTE[c].name, `data-lact="major" data-v="${c}"`, lc.major && lc.major.color === c, `colbtn c${c}`)).join('') +
       btn('⚔ 平手', 'data-lact="major" data-v="tie"', lc.major && lc.major.color == null) + '</div>';
     h += '<div class="row"><span class="lbl-s">密碼</span>' + btn('無', 'data-lact="code" data-v="none"', !lc.code) +
       btn('◎ 有出現', 'data-lact="code" data-v="o"', lc.code === 'o') + btn('⊘ 不會出現', 'data-lact="code" data-v="x"', lc.code === 'x') + '</div>';
@@ -307,7 +365,7 @@
     h += numRow('連線', 'streak', lc.streak ? lc.streak.k : null, puzzle.n);
     h += numRow('雙格', 'double', lc.double ? lc.double.k : null, Math.floor(puzzle.n / 2));
     h += '<div class="row"><span class="lbl-s">方格</span>' + btn('無', 'data-lact="blocks-color" data-v="-1"', !lc.blocks) +
-      Array.from({ length: K }, (_, c) => btn(S.PALETTE[c].name, `data-lact="blocks-color" data-v="${c}"`, lc.blocks && lc.blocks.color === c, `colbtn c${c}`)).join('') + '</div>';
+      usedColors().map((c) => btn(S.PALETTE[c].name, `data-lact="blocks-color" data-v="${c}"`, lc.blocks && lc.blocks.color === c, `colbtn c${c}`)).join('') + '</div>';
     if (lc.blocks) {
       h += '<div class="row"><span class="lbl-s">方塊數</span>' + Array.from({ length: Math.ceil(puzzle.n / 2) + 1 }, (_, v) => btn(v, `data-lact="blocks-k" data-v="${v}"`, lc.blocks.k === v, 'numbtn')).join('') + '</div>';
     }
@@ -325,7 +383,7 @@
     const cell = puzzle.cells[sel];
     let h = `<h3>${S.cellName(puzzle.n, sel)} 格子</h3>`;
     h += '<div class="row"><span class="lbl-s">顏色</span>' + btn('未知', 'data-act="color" data-v="-1"', cell.color == null) +
-      Array.from({ length: puzzle.K }, (_, c) => btn(`${S.PALETTE[c].name} <kbd>${COLOR_HOTKEYS[c].toUpperCase()}</kbd>`, `data-act="color" data-v="${c}"`, cell.color === c, `colbtn c${c}`)).join('') + '</div>';
+      usedColors().map((c, idx) => btn(`${S.PALETTE[c].name} <kbd>${COLOR_HOTKEYS[idx].toUpperCase()}</kbd>`, `data-act="color" data-v="${c}"`, cell.color === c, `colbtn c${c}`)).join('') + '</div>';
     h += '<div class="lbl-s">線索</div>' + clueEditorHTML(sel, cell.clue);
     if (cell.clue && cell.color == null && NUM_TYPES.includes(cell.clue.type)) {
       h += '<p class="hint">顏色未知的數字線索 = 預覽規則（顏色要填色後才知道）。</p>';
@@ -365,13 +423,13 @@
   }
   function flash(msg) { $('cell-info').textContent = msg; }
 
-  function resize(n, K) {
+  function resize(n) {
     n = Math.max(3, Math.min(12, n | 0));
-    const old = puzzle, np = S.emptyPuzzle(n, K);
+    const old = puzzle, np = S.emptyPuzzle(n, usedColors());
+    np.fake = old.fake;
     for (let r = 0; r < Math.min(n, old.n); r++) {
       for (let c = 0; c < Math.min(n, old.n); c++) {
         const cell = Object.assign({}, old.cells[r * old.n + c]);
-        if (cell.color != null && cell.color >= K) cell.color = null;
         np.cells[r * n + c] = cell;
       }
       np.rows[r] = old.rows[r] || {};
@@ -615,7 +673,7 @@
     }
     if (selLine) return;
     const ci = COLOR_HOTKEYS.indexOf(k);
-    if (ci >= 0 && ci < puzzle.K) setCellColor(ci);
+    if (ci >= 0 && ci < usedColors().length) setCellColor(usedColors()[ci]);
     else if (/^[0-8]$/.test(k)) {
       const cl = puzzle.cells[sel].clue;
       const next = cl && NUM_TYPES.includes(cl.type) ? Object.assign({}, cl, { k: Number(k) }) : { type: 'num', k: Number(k) };
@@ -626,7 +684,7 @@
     ev.preventDefault();
   });
 
-  $('btn-resize').addEventListener('click', () => resize(Number($('size').value), Number($('colors').value)));
+  $('btn-resize').addEventListener('click', () => resize(Number($('size').value)));
   // 不用 confirm()：有些內嵌瀏覽器會直接擋掉對話框。改成 3 秒內再按一次才清空
   let clearArmed = null;
   $('btn-clear').addEventListener('click', () => {
@@ -638,7 +696,7 @@
     }
     clearTimeout(clearArmed); clearArmed = null; b.textContent = '清空';
     const fake = puzzle.fake;
-    puzzle = S.emptyPuzzle(puzzle.n, puzzle.K);
+    puzzle = S.emptyPuzzle(puzzle.n, usedColors());
     puzzle.fake = fake;
     sel = 0; selLine = null; save(); render();
   });
@@ -661,8 +719,24 @@
   $('btn-none-rest').addEventListener('click', noneForRest);
   $('btn-save-progress').addEventListener('click', saveProgress);
 
-  function syncSettings() { $('size').value = puzzle.n; $('colors').value = puzzle.K; $('opt-fake').checked = !!puzzle.fake; }
+  function syncSettings() { $('size').value = puzzle.n; $('opt-fake').checked = !!puzzle.fake; renderUsedColors(); renderThemeEditor(); }
   $('opt-fake').addEventListener('change', (ev) => { puzzle.fake = ev.target.checked || undefined; save(); render(); });
+  $('used-colors').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-slot]'); if (b) toggleUsed(Number(b.dataset.slot));
+  });
+  $('theme-editor').addEventListener('input', (ev) => {
+    const el = ev.target, k = Number(el.dataset.slot);
+    if (Number.isNaN(k)) return;
+    if (el.type === 'color') theme[k].hex = el.value; else theme[k].name = el.value.trim() || `色${k + 1}`;
+    saveTheme(); applyTheme(); renderUsedColors(); render();
+  });
+  $('btn-theme-reset').addEventListener('click', () => {
+    theme = DEFAULT_THEME.map((x) => Object.assign({}, x));
+    saveTheme(); applyTheme(); syncSettings(); render();
+  });
+
+  applyTheme();
+  lastColor = usedColors()[0];
   syncSettings();
   render();
 })();

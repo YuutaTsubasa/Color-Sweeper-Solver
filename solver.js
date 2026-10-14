@@ -57,9 +57,13 @@
 
   // ---------- 盤面資料 ----------
 
-  function emptyPuzzle(n, K) {
+  // 顏色以「色位」0~3 表示（對應使用者配色的四格）；used = 這題出現的色位。
+  // 內部一律以 4 色計算，未使用的色位直接從候選中排除。
+  function emptyPuzzle(n, used) {
+    if (used == null) used = 3;
+    if (typeof used === 'number') used = Array.from({ length: used }, (_, k) => k);
     return {
-      n, K: K || 3,
+      n, K: 4, used: used.slice(),
       cells: Array.from({ length: n * n }, () => ({ color: null, clue: null })),
       rows: Array.from({ length: n }, () => ({})),
       cols: Array.from({ length: n }, () => ({})),
@@ -140,8 +144,10 @@
     return { n, K, NC, nv, cons, relevant: scopeSet, strip };
   }
 
+  const usedMask = (p) => (p.used || [0, 1, 2]).reduce((m, k) => m | bit(k), 0);
+
   function initialDomains(puzzle) {
-    const n = puzzle.n, all = (1 << puzzle.K) - 1;
+    const all = usedMask(puzzle);
     const dom = puzzle.cells.map((c) => (c.color != null ? bit(c.color) : all));
     for (let k = 0; k < SYMBOLS.length * 8; k++) dom.push(3);
     return dom;
@@ -842,7 +848,9 @@
     if (text.startsWith('{')) {
       const p = JSON.parse(text);
       if (!p.n || !Array.isArray(p.cells) || p.cells.length !== p.n * p.n) throw new Error('格式不正確');
-      p.K = p.K || 3;
+      // 舊格式只有 K（顏色數）：視為使用前 K 個色位
+      if (!Array.isArray(p.used)) p.used = Array.from({ length: p.K || 3 }, (_, k) => k);
+      p.K = 4;
       p.rows = p.rows || Array.from({ length: p.n }, () => ({}));
       p.cols = p.cols || Array.from({ length: p.n }, () => ({}));
       return p;
@@ -865,7 +873,9 @@
   }
 
   const api = {
-    PALETTE, DIRS, SYMBOLS, SAME, DIFF, bit, single, popcount, bitsOf,
+    PALETTE, DIRS, SYMBOLS, SAME, DIFF, bit, single, popcount, bitsOf, usedMask,
+    // 解說文字使用的顏色名稱（跟著使用者配色）
+    setColorNames(names) { names.forEach((nm, k) => { if (PALETTE[k] && nm) PALETTE[k].name = nm; }); },
     neighbors, neighborDir, rayCells, knightCells, lineCells, cellName,
     emptyPuzzle, buildModel, initialDomains, applyEffects, findContradiction, nextStep, hasSolution,
     serialize, parse, fmt,

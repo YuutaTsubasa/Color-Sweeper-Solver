@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ColorSweeper 解題器</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>ColorSweeper 解題器</h1>
+  <div class="tabs" role="tablist">
+    <button id="tab-edit" class="tab active" data-mode="edit">① 輸入盤面</button>
+    <button id="tab-solve" class="tab" data-mode="solve">② 逐步解題</button>
+  </div>
+</header>
+
+<main>
+  <section class="board-wrap">
+    <div id="board" class="board"></div>
+    <p id="cell-info" class="cell-info"></p>
+    <div id="knowledge" class="knowledge"></div>
+  </section>
+
+  <section class="panel">
+    <!-- 編輯模式 -->
+    <div id="panel-edit">
+      <div class="group">
+        <div class="row">
+          <label>大小 <input id="size" type="number" min="3" max="12" value="6"></label>
+          <label>顏色數
+            <select id="colors"><option value="2">2 色</option><option value="3" selected>3 色</option><option value="4">4 色</option></select>
+          </label>
+          <button id="btn-resize">套用</button>
+          <button id="btn-clear" class="ghost">清空</button>
+          <button id="btn-sample" class="ghost">載入範例</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-fake"> 偽裝規則（所有非零偶數都可能是實際值的兩倍，斜體顯示）</label>
+      </div>
+
+      <div class="group" id="cell-editor"></div>
+
+      <p class="hint">
+        點格子編輯格子；點盤面<b>左側列號</b>或<b>上方欄號</b>編輯行列線索（計數、方格、連線、雙格、主要、密碼）。<br>
+        鍵盤：方向鍵移動、<kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> 設顏色、<kbd>0</kbd>–<kbd>8</kbd> 設數字線索、<kbd>Del</kbd> 清除。<br>
+        沒有數字的色格（原本就沒有、任務完成後消失、或已填好）只設顏色即可。
+      </p>
+
+      <details class="group">
+        <summary>匯入／匯出</summary>
+        <textarea id="io" rows="6" spellcheck="false"></textarea>
+        <div class="row">
+          <button id="btn-export" class="ghost">匯出目前盤面</button>
+          <button id="btn-import">匯入</button>
+        </div>
+        <p id="io-msg" class="hint"></p>
+      </details>
+    </div>
+
+    <!-- 解題模式 -->
+    <div id="panel-solve" hidden>
+      <div class="group row">
+        <button id="btn-hint">💡 提示下一步</button>
+        <button id="btn-apply" disabled>✔ 套用並繼續</button>
+        <button id="btn-undo" class="ghost" disabled>↶ 復原</button>
+        <button id="btn-all" class="ghost">一鍵解完</button>
+        <button id="btn-restart" class="ghost">重新開始</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="opt-reveal"> 先只標出要看的線索，再按一次提示才顯示推理</label>
+      <div id="progress" class="progress"></div>
+      <div id="reveal-box" class="group" hidden>
+        <p id="reveal-title" class="reveal-title"></p>
+        <div id="reveal-editor"></div>
+        <p class="hint">遊戲中每填好一格，可能會冒出新線索。輸入後就成為新線索；按鍵盤數字鍵可快速輸入數字，<kbd>N</kbd> = 沒有線索，輸入完會跳到下一個 <b>?</b> 格。</p>
+      </div>
+      <div class="row">
+        <button id="btn-none-rest" class="ghost" hidden>其餘 ? 格都沒有線索</button>
+        <button id="btn-save-progress" class="ghost">把目前進度存成盤面</button>
+      </div>
+      <div id="step" class="step"></div>
+      <details class="group" id="log-wrap">
+        <summary>已套用步驟（<span id="log-count">0</span>）</summary>
+        <ol id="log" class="log"></ol>
+      </details>
+    </div>
+  </section>
+</main>
+
+<script src="solver.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

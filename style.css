@@ -1,0 +1,184 @@
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --text: #2b2a33;
+  --muted: #6e6c78;
+  --line: #dddbe3;
+  --cell: #ececef;
+  --accent: #2f9e5b;
+  /* 遊戲「寶石」配色：紫、藍、粉、綠 */
+  --c0-bg: #cdc9ec; --c0: #8a7fd6; --c0-fg: #2b2a33;
+  --c1-bg: #4570f5; --c1: #3d63e0; --c1-fg: #ffffff;
+  --c2-bg: #ec4a83; --c2: #d83b73; --c2-fg: #ffffff;
+  --c3-bg: #6dd5a6; --c3: #2fae76; --c3-fg: #2b2a33;
+  --bad: #d64545;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1a20; --surface: #26252d; --text: #ecebf2; --muted: #a09eab;
+    --line: #3a3944; --cell: #33323b;
+    --c0-bg: #8f86c9; --c0: #b6adf5; --c0-fg: #16151b;
+    --c1: #7c9bff; --c2: #ff7aa8; --c3: #7fe2b5;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  line-height: 1.6;
+}
+header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+h1 { font-size: 1.25rem; margin: 0; }
+h3 { font-size: .95rem; margin: 0 0 8px; }
+.tabs { display: flex; gap: 6px; }
+.tab { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+main {
+  display: grid; grid-template-columns: minmax(0, auto) minmax(300px, 480px);
+  gap: 24px; padding: 20px 16px; max-width: 1150px; margin: 0 auto; align-items: start;
+}
+@media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+button {
+  font: inherit; font-size: .9rem; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+button:disabled { opacity: .45; cursor: default; }
+button.sel { outline: 3px solid var(--text); outline-offset: 1px; }
+button.opt { padding: 4px 10px; }
+input[type=number], select { width: 4.5em; font: inherit; padding: 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+select { width: auto; }
+textarea { width: 100%; font-family: Consolas, monospace; font-size: .85rem; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 8px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: .75em; }
+
+.panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; align-items: center; }
+.lbl-s { font-size: .8rem; color: var(--muted); min-width: 3.5em; }
+.hint { color: var(--muted); font-size: .85rem; margin: 6px 0 0; }
+summary { cursor: pointer; font-weight: 600; }
+.toggle { font-size: .85rem; color: var(--muted); display: block; margin: 2px 0 6px; }
+
+.colbtn.c0 { background: var(--c0-bg); border-color: var(--c0); color: var(--c0-fg); }
+.colbtn.c1 { background: var(--c1-bg); border-color: var(--c1); color: var(--c1-fg); }
+.colbtn.c2 { background: var(--c2-bg); border-color: var(--c2); color: var(--c2-fg); }
+.colbtn.c3 { background: var(--c3-bg); border-color: var(--c3); color: var(--c3-fg); }
+.numbtn { min-width: 2.3em; }
+.glyphbtn { font-size: 1.1rem; min-width: 2.3em; }
+
+/* ---------- 盤面 ---------- */
+.board-wrap { min-width: 0; overflow-x: auto; }
+.board {
+  --cs: min(54px, calc((100vw - 96px) / (var(--n) + 1.2)));
+  display: grid; grid-template-columns: auto repeat(var(--n), var(--cs));
+  grid-template-rows: auto; grid-auto-rows: var(--cs); gap: 3px; width: max-content; user-select: none;
+}
+.corner { min-width: 18px; }
+.hdr { display: flex; align-items: center; justify-content: flex-end; gap: 3px; color: var(--muted); font-size: .75rem; cursor: pointer; border-radius: 6px; padding: 0 3px; }
+.hdr.top { flex-direction: column; justify-content: flex-end; padding: 3px 0; min-height: 18px; }
+.hdr .badges { display: flex; gap: 2px; }
+.hdr.top .badges { flex-direction: column; align-items: center; }
+.hdr.selected { outline: 2px solid var(--text); }
+.badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 1.6em; height: 1.6em; padding: 0 3px;
+  border-radius: 99px; font-weight: 700; font-size: .78rem; color: var(--text);
+}
+.badge.c0 { background: var(--c0-bg); color: var(--c0-fg); }
+.badge.c1 { background: var(--c1-bg); color: var(--c1-fg); }
+.badge.c2 { background: var(--c2-bg); color: var(--c2-fg); }
+.badge.c3 { background: var(--c3-bg); color: var(--c3-fg); }
+.badge.cx, .badge.cu { background: var(--cell); }
+.fake { font-style: italic; }
+.badge.sq { border-radius: 4px; }
+
+/* 棒狀：橫向 = 數字上下有槓、直向 = 左右有槓 */
+.cell .bar-h { border-top: 3px solid currentColor; border-bottom: 3px solid currentColor; line-height: 1.05; padding: 0 2px; }
+.cell .bar-v { border-left: 3px solid currentColor; border-right: 3px solid currentColor; padding: 0 4px; line-height: 1.1; }
+.cell .tri { display: inline-block; font-size: .7em; }
+/* 多邊形線索的小圖 */
+.cell .shape { display: inline-grid; gap: 1px; width: 58%; }
+.cell .shape i { aspect-ratio: 1; }
+.cell .shape i.on { background: currentColor; border-radius: 1px; }
+.pgrid { display: grid; grid-template-columns: repeat(5, 22px); gap: 2px; }
+.pcell { width: 22px; height: 22px; padding: 0; border-radius: 4px; border: 1px solid var(--line); background: var(--cell); }
+.pcell.on { background: var(--text); border-color: var(--text); }
+
+.cell {
+  position: relative; border-radius: 6px; background: var(--cell);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  font-weight: 700; font-size: calc(var(--cs) * .48);
+}
+.cell.clue.c0 { background: var(--c0-bg); color: var(--c0-fg); }
+.cell.clue.c1 { background: var(--c1-bg); color: var(--c1-fg); }
+.cell.clue.c2 { background: var(--c2-bg); color: var(--c2-fg); }
+.cell.clue.c3 { background: var(--c3-bg); color: var(--c3-fg); }
+.cell.clue.cu { background: var(--cell); }
+.cell .num.sm { font-size: .85em; }
+.cell .arrow { font-size: .6em; margin-left: 1px; }
+.cell .glyph { font-size: .9em; }
+.cell .sub { position: absolute; bottom: 1px; right: 4px; font-size: .5em; }
+.cell .code-mark { font-size: .55em; font-family: Georgia, serif; }
+.cell .pair-mark { position: absolute; font-size: .45em; z-index: 2; color: var(--text); background: var(--surface); border-radius: 4px; padding: 0 2px; line-height: 1.3; }
+.cell .pair-mark.d2 { right: -10px; } .cell .pair-mark.d6 { left: -10px; }
+.cell .pair-mark.d4 { bottom: -9px; } .cell .pair-mark.d0 { top: -9px; }
+.cell .fill { position: absolute; inset: 6%; border-radius: 5px; }
+.cell .fill.c0 { background: var(--c0-bg); } .cell .fill.c1 { background: var(--c1-bg); }
+.cell .fill.c2 { background: var(--c2-bg); } .cell .fill.c3 { background: var(--c3-bg); }
+.cell .spent { opacity: .3; }
+.cell .xs { position: absolute; top: 2px; left: 4px; display: flex; gap: 1px; font-size: calc(var(--cs) * .22); line-height: 1; }
+.cell .xs .c0 { color: var(--c0); } .cell .xs .c1 { color: var(--c1); } .cell .xs .c2 { color: var(--c2); } .cell .xs .c3 { color: var(--c3); }
+.cell .pending { position: absolute; top: 1px; right: 4px; font-size: calc(var(--cs) * .28); color: var(--text); opacity: .6; font-weight: 700; }
+.cell.selected { outline: 3px solid var(--text); outline-offset: 1px; }
+.cell.ref { box-shadow: 0 0 0 3px var(--text) inset; }
+.cell.shared::after { content: ""; position: absolute; inset: 0; border-radius: 6px; background: repeating-linear-gradient(45deg, transparent 0 5px, rgba(127,127,127,.25) 5px 8px); }
+.cell.target { animation: pulse 1.1s ease-in-out infinite; z-index: 1; }
+.cell.target.t0 { outline: 3px dashed var(--c0); outline-offset: 1px; }
+.cell.target.t1 { outline: 3px dashed var(--c1); outline-offset: 1px; }
+.cell.target.t2 { outline: 3px dashed var(--c2); outline-offset: 1px; }
+.cell.target.t3 { outline: 3px dashed var(--c3); outline-offset: 1px; }
+.cell .tag { position: absolute; bottom: 1px; right: 3px; font-size: calc(var(--cs) * .28); color: var(--text); }
+.cell.contra { box-shadow: 0 0 0 3px var(--bad) inset; }
+@keyframes pulse { 50% { transform: scale(.92); } }
+@media (prefers-reduced-motion: reduce) { .cell.target { animation: none; } }
+.cell-info { color: var(--muted); font-size: .85rem; min-height: 1.6em; }
+
+/* 符號圖案 / 密碼 */
+.knowledge .row { gap: 10px; }
+.sym-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; text-align: center; }
+.sym-card .hint { margin: 2px 0 0; font-size: .75rem; }
+.mini { display: grid; grid-template-columns: repeat(3, 22px); gap: 2px; }
+.mc { height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: .8rem; font-weight: 700; background: var(--cell); }
+.mc.center { background: transparent; font-size: 1rem; }
+.mc.same { background: #c8ecd7; color: #1f6b42; }
+.mc.diff { background: #f6cfd3; color: #9b2633; }
+.mc.unk { color: var(--muted); }
+.mc.hit { outline: 2px dashed var(--text); }
+
+/* ---------- 解題說明 ---------- */
+.progress { font-size: .85rem; color: var(--muted); }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.step h4 { margin: 0 0 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.step ul, .step ol { margin: 4px 0; padding-left: 1.4em; }
+.step .det { margin-top: 6px; }
+.lv { font-size: .75rem; padding: 1px 8px; border-radius: 99px; color: #fff; }
+.lv1 { background: #2f9e5b; } .lv2 { background: #2f7fc1; } .lv3 { background: #c4781d; } .lv4 { background: #b23b3b; }
+.chip, .clue-ref { padding: 0 4px; border-radius: 4px; font-weight: 700; }
+.chip.c0, .clue-ref.c0 { background: var(--c0-bg); color: var(--c0-fg); }
+.chip.c1, .clue-ref.c1 { background: var(--c1-bg); color: var(--c1-fg); }
+.chip.c2, .clue-ref.c2 { background: var(--c2-bg); color: var(--c2-fg); }
+.chip.c3, .clue-ref.c3 { background: var(--c3-bg); color: var(--c3-fg); }
+.clue-ref.cx { background: var(--cell); }
+.cn { font-family: Consolas, monospace; }
+.bad { color: var(--bad); }
+.chain li { font-size: .9rem; }
+.log { font-size: .85rem; padding-left: 1.6em; max-height: 280px; overflow: auto; }
+.done { color: var(--accent); font-weight: 700; }
+.reveal-title { margin: 0 0 8px; }
+.tip { margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--cell); font-size: .88rem; }
+[hidden] { display: none !important; }

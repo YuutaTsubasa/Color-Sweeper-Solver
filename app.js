@@ -173,6 +173,13 @@
     return out.join('');
   }
 
+  // 已排除的顏色：在格子左上角畫小 ✕
+  function xMarks(i) {
+    const m = dom[i], xs = [];
+    for (const k of usedColors()) if (!(m & S.bit(k))) xs.push(`<span class="c${k}">✕</span>`);
+    return xs.length ? `<span class="xs">${xs.join('')}</span>` : '';
+  }
+
   // 目前格子實際的「顏色、線索」（解題中含解出的顏色與新線索）
   function effCell(i) {
     const cell = puzzle.cells[i];
@@ -220,13 +227,13 @@
             if (area.every((j) => S.single(dom[j]) >= 0)) ch = `<span class="spent">${ch}</span>`;
           }
           inner = ch;
+          // 顏色未知的線索格（密碼格、預覽數字）也要顯示已排除的顏色
+          if (mode === 'solve' && ec.color == null) inner += xMarks(i);
         } else if (ec.color != null) {
           inner = `<span class="fill c${ec.color}"></span>`;
           if (pendingSet.has(i)) inner += '<span class="pending" title="還沒輸入遊戲中這格的線索">?</span>';
         } else if (mode === 'solve') {
-          const m = dom[i], xs = [];
-          for (const k of usedColors()) if (!(m & S.bit(k))) xs.push(`<span class="c${k}">✕</span>`);
-          if (xs.length) inner = `<span class="xs">${xs.join('')}</span>`;
+          inner = xMarks(i);
         }
         if (i === sel && !selLine) cls.push('selected');
         if (targets.has(i)) {

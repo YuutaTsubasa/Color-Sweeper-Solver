@@ -355,19 +355,27 @@
     return h;
   }
 
+  // 預設方向：選第一個有格子的方向（例如最右欄的射線預設往左）
+  function openDir(order) {
+    return order.find((d) => S.rayCells(puzzle.n, sel, d).length > 0) ?? order[0];
+  }
+
   function applyClueAct(clue, act, v, checked) {
     if (act === 'type') {
       if (v === 'none') return null;
       if (clue && clue.type === v) return clue;
       if (v === 'num') return { type: 'num', k: clue && clue.k != null ? clue.k : 1 };
-      if (v === 'ray') return { type: 'ray', dir: 2, k: clue && clue.k != null ? clue.k : 1 };
+      if (v === 'ray') {
+        const dir = openDir([2, 6, 4, 0]);
+        return { type: 'ray', dir, k: Math.min(clue && clue.k != null ? clue.k : 1, S.rayCells(puzzle.n, sel, dir).length) };
+      }
       if (v === 'knight') return { type: 'knight', k: 1 };
       if (v === 'sym') return { type: 'sym', id: 0 };
-      if (v === 'pair') return { type: 'pair', dir: 2 };
+      if (v === 'pair') return { type: 'pair', dir: openDir([2, 4, 6, 0]) };
       if (v === 'code') return { type: 'code', pos: 1, orient: 'h' };
       if (v === 'bar') return { type: 'bar', axis: 'h', k: clue && clue.k != null ? clue.k : 1 };
       if (v === 'poly') return { type: 'poly', shape: [[0, 0]] };
-      if (v === 'mirror') return { type: 'mirror', dir: 2 };
+      if (v === 'mirror') return { type: 'mirror', dir: openDir([2, 6, 4, 0, 3, 5, 1, 7]) };
     }
     const c = Object.assign({}, clue);
     if (act === 'axis') c.axis = v;
@@ -655,7 +663,11 @@
     if (!isSolved(sel)) return;
     if (clue && NUM_TYPES.includes(clue.type)) {
       const max = maxCountFor(sel, clue);
-      if (clue.k > max) { flash(`${S.cellName(puzzle.n, sel)} 這個方向只有 ${max} 格`); return; }
+      if (clue.k > max) {
+        // 打錯的數字（例如角落格打 5）才拒絕；切換方向時把數字調到上限即可
+        if (clue.type === 'num') { flash(`${S.cellName(puzzle.n, sel)} 周圍只有 ${max} 格`); return; }
+        clue = Object.assign({}, clue, { k: max });
+      }
     }
     const name = S.cellName(puzzle.n, sel);
     const wasNew = !reveal.has(sel);

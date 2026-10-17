@@ -625,11 +625,31 @@
     if (!elims.length) return null;
     const effects = elims.map((e) => ({ v: e.v, c: e.a, val: false }));
     if (!F) return { effects };
-    const html = `看 ${con.labelH(dom, F)}：<ul>` +
-      elims.map((e) => `<li>若 ${F.varH(e.v)} 是${F.valH(e.v, e.a)}：${e.why} → <b>排除</b></li>`).join('') + '</ul>';
-    const short = `${con.labelT(dom, F)} → ` + elims.map((e) => `${F.varName(e.v)}≠${F.valT(e.v, e.a)}`).join('、');
+    // 同一格合併成一句；排除後只剩一色就直接寫結論（D1≠紫、D1≠藍 → D1=綠）
+    const after = applyEffects(dom, effects);
+    const groups = new Map();
+    for (const e of elims) { if (!groups.has(e.v)) groups.set(e.v, []); groups.get(e.v).push(e); }
+    const items = [...groups].map(([v, es]) => ({ v, es, s: single(after[v]) }));
+    const html = `看 ${con.labelH(dom, F)}：<ul>` + items.map(({ v, es, s }) => {
+      // 理由相同就合併：「是紫或藍的話，……」
+      const byWhy = new Map();
+      for (const e of es) { if (!byWhy.has(e.why)) byWhy.set(e.why, []); byWhy.get(e.why).push(e.a); }
+      const why = es.length === 1 ? es[0].why
+        : [...byWhy].map(([w, as]) => `是${as.map((x) => F.valH(v, x)).join('或')}的話，${w}`).join('；');
+      return s >= 0
+        ? `<li>${F.varH(v)} <b>只能是</b>${F.valH(v, s)}（${why}）</li>`
+        : `<li>${F.varH(v)} <b>不是</b>${es.map((e) => F.valH(v, e.a)).join('、')}（${why}）</li>`;
+    }).join('') + '</ul>';
+    // 結論相同的格子並在一起：A1、A2=藍；D4、D5≠紫
+    const same = new Map();
+    for (const { v, es, s } of items) {
+      const key = s >= 0 ? `=${F.valT(v, s)}` : `≠${es.map((e) => F.valT(v, e.a)).join('、')}`;
+      if (!same.has(key)) same.set(key, []);
+      same.get(key).push(F.varName(v));
+    }
+    const short = `${con.labelT(dom, F)} → ` + [...same].map(([key, names]) => names.join('、') + key).join('；');
     const TITLE = { count: '線索數量檢查', sym: '符號關係', pair: '成對規則', major: '主要規則', code: '密碼規則', eq: '對稱規則', bar: '棒狀規則', poly: '多邊形規則', runs: '行列方塊規則' };
-    return { level: 1, kind: con.type, title: TITLE[con.type], html, short, effects, refs: con.refs };
+    return { level: 1, kind: con.type, title: TITLE[con.type], html, short, effects, refs: con.refs, statesResult: true };
   }
 
   // ---------- Lv2：兩個同色計數限制比對 ----------
@@ -754,7 +774,10 @@
         if (res.contradiction.con) res.contradiction.con.refs.forEach((r) => refs.add(r));
         return {
           level: 3, kind: 'trial', title: `假設法（${res.chain.length + 1} 步內出現矛盾）`, html,
-          short: `假設 ${F.varName(v)} 是${F.valT(v, a)} 會矛盾 → 不是${F.valT(v, a)}`,
+          short: (() => {
+            const rest = single(dom[v] & ~bit(a));
+            return `假設 ${F.varName(v)} 是${F.valT(v, a)} 會矛盾 → ` + (rest >= 0 ? `${F.varName(v)}=${F.valT(v, rest)}` : `不是${F.valT(v, a)}`);
+          })(),
           effects: [{ v, c: a, val: false }], refs: [...refs],
         };
       }
@@ -832,8 +855,9 @@
     for (const v of uniq(st.effects.map((e) => e.v))) {
       if (v < model.NC && single(dom[v]) < 0 && single(after[v]) >= 0) det.push({ v, c: single(after[v]) });
     }
-    if (det.length && st.effects.some((e) => !e.val)) {
+    if (det.length && st.effects.some((e) => !e.val) && !st.statesResult) {
       st.html += '<div class="det">' + det.map((d) => `→ ${F.varH(d.v)} 只剩${F.colorH(d.c)}可填，確定是${F.colorH(d.c)}。`).join('<br>') + '</div>';
+      if (st.kind !== 'trial') st.short += '（' + det.map((d) => `${F.varName(d.v)}=${PALETTE[d.c].name}`).join('、') + '）';
     }
     st.determined = det;
     return { status: 'step', step: st };
